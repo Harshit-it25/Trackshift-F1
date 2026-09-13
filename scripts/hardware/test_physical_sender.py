@@ -9,13 +9,14 @@ Usage:
     python scripts/hardware/test_physical_sender.py --impossible-val
 """
 
+import os
 import sys
 import time
 import argparse
 import requests
 
-DEFAULT_URL = "http://localhost:8000/api/physical-telemetry/ingest"
-DEFAULT_KEY = "trackshift_dev_key_2025"
+DEFAULT_URL = os.environ.get("TRACKSHIFT_INGEST_URL", "http://localhost:8000/api/physical-telemetry/ingest")
+DEFAULT_KEY = os.environ.get("TRACKSHIFT_DEVICE_KEY", "trackshift_dev_key_2025")
 
 
 def parse_args():

@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
+  API_BASE,
   getPhysicalTelemetryStatus, 
   getPhysicalDevices, 
   getLatestPhysicalTelemetry,
   getPhysicalTelemetryHistory,
-  createPhysicalTelemetryWebSocket 
+  createPhysicalTelemetryWebSocket,
+  ingestPhysicalTelemetry
 } from '../api';
 import {
   LineChart,
@@ -37,44 +39,32 @@ export default function PhysicalTelemetryPanel() {
     setTestSending(true);
     setTestResult(null);
     try {
-      const res = await fetch('http://localhost:8000/api/physical-telemetry/ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-Key': 'trackshift_dev_key_2025'
-        },
-        body: JSON.stringify({
-          device_id: selectedDeviceId || 'TRACKSHIFT-ESP32-01',
-          timestamp: Date.now() / 1000,
-          sequence: (latestPacket?.sequence || 0) + 1,
-          transport: 'HTTP_WIFI',
-          sensors: {
-            tyre_temperature: {
-              FL: 84.5,
-              FR: 85.2,
-              RL: 81.0,
-              RR: 81.8
-            },
-            tyre_pressure: {
-              FL: 21.4,
-              FR: 21.6,
-              RL: 20.8,
-              RR: 21.0
-            },
-            tyre_pressure_unit: 'psi',
-            ambient_temperature: 24.5,
-            track_temperature: 34.8
-          }
-        })
+      const data = await ingestPhysicalTelemetry({
+        device_id: selectedDeviceId || 'TRACKSHIFT-ESP32-01',
+        timestamp: Date.now() / 1000,
+        sequence: (latestPacket?.sequence || 0) + 1,
+        transport: 'HTTP_WIFI',
+        sensors: {
+          tyre_temperature: {
+            FL: 84.5,
+            FR: 85.2,
+            RL: 81.0,
+            RR: 81.8
+          },
+          tyre_pressure: {
+            FL: 21.4,
+            FR: 21.6,
+            RL: 20.8,
+            RR: 21.0
+          },
+          tyre_pressure_unit: 'psi',
+          ambient_temperature: 24.5,
+          track_temperature: 34.8
+        }
       });
-      const data = await res.json();
-      if (res.ok) {
-        setTestResult({ success: true, message: `Packet #${data.sequence} ingested via port 8000!` });
-      } else {
-        setTestResult({ success: false, message: data.detail || 'Ingestion failed' });
-      }
+      setTestResult({ success: true, message: `Packet #${data.sequence} ingested successfully!` });
     } catch (err) {
-      setTestResult({ success: false, message: `Endpoint unreachable: ${err.message}` });
+      setTestResult({ success: false, message: err.message || 'Ingestion failed' });
     } finally {
       setTestSending(false);
     }
@@ -414,7 +404,7 @@ export default function PhysicalTelemetryPanel() {
             <h3 style={{ margin: 0, fontSize: '15px', color: '#00D2BE', display: 'flex', alignItems: 'center', gap: '8px' }}>
               🔌 PHYSICAL SENSOR CONNECTION INGESTION INTERFACE
             </h3>
-            <span style={{ fontSize: '11px', color: '#8E8EA8' }}>Authoritative Ingestion Port: 8000</span>
+            <span style={{ fontSize: '11px', color: '#8E8EA8' }}>Authoritative Ingestion Endpoint: {API_BASE}/api/physical-telemetry/ingest</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
@@ -426,8 +416,8 @@ export default function PhysicalTelemetryPanel() {
               <p style={{ fontSize: '11px', color: '#8E8EA8', margin: '0 0 10px 0' }}>
                 Microcontroller posts JSON directly over local Wi-Fi.
               </p>
-              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#00D2BE', background: '#12121E', padding: '6px 8px', borderRadius: '4px', marginBottom: '6px' }}>
-                POST http://localhost:8000/api/physical-telemetry/ingest
+              <div style={{ fontSize: '11px', fontFamily: 'monospace', color: '#00D2BE', background: '#12121E', padding: '6px 8px', borderRadius: '4px', marginBottom: '6px', wordBreak: 'break-all' }}>
+                POST {API_BASE}/api/physical-telemetry/ingest
               </div>
               <div style={{ fontSize: '10px', color: '#88889C' }}>
                 Sample code: <code>scripts/hardware/esp32_firmware_sample.ino</code>
@@ -801,7 +791,7 @@ export default function PhysicalTelemetryPanel() {
         <div>
           <strong style={{ color: '#00D2BE' }}>DATA PROVENANCE:</strong> REAL PHYSICAL SENSOR TELEMETRY · 
           <span style={{ marginLeft: '4px' }}>Transport: {latestPacket?.transport || 'DISCONNECTED'}</span> · 
-          <span style={{ marginLeft: '4px' }}>Ingestion Layer: FastAPI authoritative (Port 8000)</span>
+          <span style={{ marginLeft: '4px' }}>Ingestion Layer: FastAPI authoritative ({API_BASE})</span>
         </div>
         <div style={{ color: '#FFB800' }}>
           TDSM Model Architecture ($S_t = [D_t, \Delta D_t, \Delta^2 D_t]$) Strictly Frozen

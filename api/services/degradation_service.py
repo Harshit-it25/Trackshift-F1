@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 
 from api.cache import CacheKeys, get_cache_service, DATA_VERSION
+from trackshift.domain_constants import FUEL_EFFECT_COEFFICIENT
 
 logger = logging.getLogger("trackshift.api.degradation")
 
@@ -39,6 +40,12 @@ class DegradationService:
         self.db_path = db_path
         self.app_data = app_data
         self.cache = get_cache_service()
+
+    def _get_stage1_version(self) -> str:
+        return self.app_data.get("active_models", {}).get(1, MODEL_VERSION_STAGE1)
+
+    def _get_stage3_version(self) -> str:
+        return self.app_data.get("active_models", {}).get(3, MODEL_VERSION_STAGE3)
 
     def _dict_factory(self, cursor, row):
         d = {}
@@ -174,7 +181,7 @@ class DegradationService:
                     "circuit": meta.get("track_id"),
                     "event_name": meta.get("event_name"),
                     "data_version": DATA_VERSION,
-                    "model_version": MODEL_VERSION_STAGE1
+                    "model_version": self._get_stage1_version()
                 }
             }
 
@@ -220,7 +227,7 @@ class DegradationService:
                     expected_loss = float(pred_sub.loc[lap_num, 'predicted_lap_time_loss'])
                 else:
                     # Model baseline approximation: (Fuel benefit + Track evolution gain) counterbalanced by tyre age degradation
-                    fuel_delta_loss = (fuel_est - 10.0) * 0.032
+                    fuel_delta_loss = (fuel_est - 10.0) * FUEL_EFFECT_COEFFICIENT
                     evolution_benefit = (track_evolution / 5.0) * 0.25
                     tyre_age_effect = 0.08 * tyre_age + 0.0015 * (tyre_age ** 2)
                     expected_loss = tyre_age_effect + fuel_delta_loss - evolution_benefit
@@ -237,10 +244,10 @@ class DegradationService:
                     cum_debt += max(0.0, residual)
 
                 # Clean estimated tyre-performance degradation signal:
-                fuel_component = (fuel_est - 10.0) * 0.032
+                fuel_component = (fuel_est - 10.0) * FUEL_EFFECT_COEFFICIENT
                 track_evolution_component = (track_evolution / 5.0) * 0.25
                 stint_start_fuel = float(valid_laps.iloc[0].get('fuel_load_est') or max(10.0, 100.0 - (int(valid_laps.iloc[0]['lap_number']) * 1.7)))
-                fuel_burn_gain = max(0.0, stint_start_fuel - fuel_est) * 0.033
+                fuel_burn_gain = max(0.0, stint_start_fuel - fuel_est) * FUEL_EFFECT_COEFFICIENT
                 clean_deg_signal = max(0.0, raw_pace_loss + fuel_burn_gain)
 
                 # Empirical bootstrap confidence interval (95% CI)
@@ -327,8 +334,8 @@ class DegradationService:
                 "event_name": meta.get("event_name"),
                 "session_type": meta.get("session_type"),
                 "data_version": DATA_VERSION,
-                "model_version_stage1": MODEL_VERSION_STAGE1,
-                "model_version_stage3": MODEL_VERSION_STAGE3
+                "model_version_stage1": self._get_stage1_version(),
+                "model_version_stage3": self._get_stage3_version()
             }
         }
 
@@ -419,7 +426,7 @@ class DegradationService:
                 "circuit": meta.get('track_id'),
                 "season": meta.get('season'),
                 "data_version": DATA_VERSION,
-                "model_version": MODEL_VERSION_STAGE1,
+                "model_version": self._get_stage1_version(),
                 "leakage_audit_status": "ZERO_RACE_DATA_LEAKAGE_VERIFIED"
             }
         }
@@ -563,7 +570,7 @@ class DegradationService:
                     "race_session_id": race_session_id,
                     "practice_fingerprint": pred.get("frozen_snapshot", {}).get("snapshot_hash"),
                     "data_version": DATA_VERSION,
-                    "model_version": MODEL_VERSION_STAGE1
+                    "model_version": self._get_stage1_version()
                 }
             })
 
@@ -593,7 +600,7 @@ class DegradationService:
                 "circuit": r_meta.get('track_id'),
                 "season": r_meta.get('season'),
                 "data_version": DATA_VERSION,
-                "model_version": MODEL_VERSION_STAGE1
+                "model_version": self._get_stage1_version()
             }
         }
 

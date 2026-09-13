@@ -11,7 +11,7 @@ import subprocess
 import time
 import socket
 
-PORT = 8000
+PORT = int(os.environ.get("PORT", os.environ.get("TRACKSHIFT_PORT", 8000)))
 
 
 def is_port_in_use(port: int) -> bool:

@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+export const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || "http://localhost:8000";
 const OFFLINE_BASE = "/demo_offline";
 
 export let isOfflineMode = false;
@@ -557,6 +557,22 @@ export async function getPhysicalTelemetryHistory(deviceId, limit = 150) {
   } catch {
     return [];
   }
+}
+
+export async function ingestPhysicalTelemetry(payload, deviceKey = 'trackshift_dev_key_2025') {
+  const res = await fetch(`${API_BASE}/api/physical-telemetry/ingest`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Device-Key': deviceKey
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Ingest failed (${res.status}): ${errText}`);
+  }
+  return await res.json();
 }
 
 export function createPhysicalTelemetryWebSocket(onMessage, onStatusChange) {
